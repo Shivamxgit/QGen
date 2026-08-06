@@ -11,14 +11,15 @@ Study the following text carefully:
 
 Instructions:
 - Generate questions only from the provided text.
-- Cover all the important concepts and key points.
-- Do not omit any significant information.
+- Create a maximum of 10 questions. 
+- Prioritize the most important concepts and key points to fit within this limit.
 - Avoid duplicate or repetitive questions.
 - Make the questions clear, concise, and grammatically correct.
 - Include a mix of factual, conceptual, and application-based questions whenever appropriate.
 - Do not provide answers.
-- Number each question.
-- limit the questions to 20, only upto 20 questions are valid.
+- Number each question (e.g., 1. , 2. , 3. ).
+- OUTPUT FORMAT: Output ONLY the numbered questions. Do not include any introductory text, concluding remarks, or conversational filler.
+
 QUESTIONS:
 """
 

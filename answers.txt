@@ -306,3 +306,48 @@ Question: 1. In what year did leaders from 193 countries establish the Sustainab
   2. **Make a donation**.
   3. **Start a fundraiser**.
   4. **Spread the word** (share UNDP content on social media platforms like Twitter, Facebook, and Instagram).\n----------------------------------\n
+Question: 1. In what year did leaders from 193 countries come together to create the Sustainable Development Goals (SDGs)?
+Answer: Leaders from 193 countries came together in the year **2015** to create the Sustainable Development Goals (SDGs).
+----------------------------------
+
+Question: 2. Which organization is highlighted as one of the leading entities working to fulfill the SDGs by the year 2030?
+Answer: Based on the provided text, the organization highlighted as one of the leading entities working to fulfill the Sustainable Development Goals (SDGs) by the year 2030 is the **United Nations Development Programme (UNDP)**.
+----------------------------------
+
+Question: 3. What specific milestone regarding extreme poverty did the international community achieve in the 15 years leading up to the creation of the SDGs?
+Answer: Based on the provided text, the international community cut extreme poverty in half in the 15 years leading up to the creation of the SDGs.
+----------------------------------
+
+Question: 4. According to the text, approximately how many people around the world still live on less than $1.25 a day?
+Answer: According to the text, more than 800 million people around the world still live on less than $1.25 a day.
+----------------------------------
+
+Question: 5. What percentage has the total primary school enrolment rate reached in developing regions since 2000?
+Answer: Based on the provided text, the total primary school enrolment rate in developing regions has reached **91%** since 2000.
+----------------------------------
+
+Question: 6. By what year do the SDGs project that at least one in four people are likely to be affected by recurring water shortages if current paths continue?
+Answer: Based on the provided text, if we continue the path we're on, at least one in four people are likely to be affected by recurring water shortages by the year **2050**.
+----------------------------------
+
+Question: 7. How much has the number of people with access to electricity increased between the years 1990 and 2010?
+Answer: Between the years 1990 and 2010, the number of people with access to electricity increased by 1.7 billion.
+----------------------------------
+
+Question: 8. By what fraction does the text suggest we should cut per capita food waste globally to ensure sustainable consumption and production patterns?
+Answer: Based on the provided text, we should cut per capita food waste globally **in half**.
+----------------------------------
+
+Question: 9. Approximately what percentage of the human diet is made up of plant life?
+Answer: Based on the provided text, plant life makes up 80% of the human diet.
+----------------------------------
+
+Question: 10. What are four suggested ways individuals can help support and reach the Sustainable Development Goals?
+Answer: Based on the provided text, four suggested ways individuals can help support and reach the Sustainable Development Goals are:
+
+1. **Go shopping** (visit shop.undp.org for SDG merchandise)
+2. **Make a donation** (visit undp.org/takeaction)
+3. **Start a fundraiser** (to raise money, create awareness, and inspire others)
+4. **Spread the word** (search for @UNDP on Twitter, Facebook, and Instagram to share content)
+----------------------------------
+

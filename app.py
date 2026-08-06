@@ -8,7 +8,7 @@ import os
 import aiofiles
 import json
 import csv
-
+from src.helper import llm_pipeline
 
 #init fastapi
 
@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 @app.post("/upload")

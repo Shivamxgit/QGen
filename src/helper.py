@@ -56,7 +56,7 @@ def llm_pipeline(file_path):
     doc_ques_gen, doc_ans_gen =file_processing(file_path)
 
     llm_ques_gen_pipeline = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash-lite",
         temperature=0.3
 )
 
@@ -83,7 +83,7 @@ def llm_pipeline(file_path):
     embeddings
 )
     llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash",
+    model="gemini-3.5-flash-lite",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0.3,
 )

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuestGen — PDF → Q&A</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;900&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <span class="masthead-mark">QuestGen</span>
+        <h1>Turn any PDF into a study deck.</h1>
+        <p class="masthead-sub">
+          Drop a document in. Get question &amp; answer cards out.
+        </p>
+      </header>
+
+      <main class="workspace">
+        <!-- LEFT: intake -->
+        <section class="intake" aria-label="Upload document">
+          <div class="stamp-slot">
+            <div class="stamp" id="stamp" data-state="idle">
+              <span id="stampText">NO FILE</span>
+            </div>
+          </div>
+
+          <div
+            class="dropzone"
+            id="dropzone"
+            tabindex="0"
+            role="button"
+            aria-label="Choose or drop a PDF file"
+          >
+            <input type="file" id="fileInput" accept="application/pdf" hidden />
+            <p class="dz-title">Drop PDF here</p>
+            <p class="dz-sub">or click to browse — .pdf only</p>
+          </div>
+
+          <div class="file-line" id="fileLine" hidden>
+            <span class="file-name" id="fileName"></span>
+            <span class="file-size" id="fileSize"></span>
+          </div>
+
+          <button class="btn btn-primary" id="uploadBtn" disabled>
+            Upload document
+          </button>
+          <button class="btn btn-secondary" id="analyzeBtn" disabled>
+            Generate questions
+          </button>
+
+          <p class="status-line" id="statusLine" aria-live="polite"></p>
+        </section>
+
+        <!-- RIGHT: results -->
+        <section class="results" aria-label="Generated questions and answers">
+          <div class="results-head">
+            <h2>Question deck</h2>
+            <a class="download-link" id="downloadLink" href="#" hidden download
+              >Download CSV ↓</a
+            >
+          </div>
+
+          <div class="deck" id="deck">
+            <div class="empty-state" id="emptyState">
+              <p>
+                Cards will stack up here once your document has been processed.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>QuestGen</span>
+      </footer>
+    </div>
+
+    <script src="/static/js/script.js"></script>
+  </body>
+</html>
