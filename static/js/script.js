@@ -1,11 +1,13 @@
 (function () {
   "use strict";
 
+  // DOM Elements
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const fileLine = document.getElementById("fileLine");
   const fileName = document.getElementById("fileName");
   const fileSize = document.getElementById("fileSize");
+  const clearFileBtn = document.getElementById("clearFileBtn");
   const uploadBtn = document.getElementById("uploadBtn");
   const analyzeBtn = document.getElementById("analyzeBtn");
   const statusLine = document.getElementById("statusLine");
@@ -15,17 +17,91 @@
   const emptyState = document.getElementById("emptyState");
   const downloadLink = document.getElementById("downloadLink");
 
+  // New UX Elements
+  const shimmerLoading = document.getElementById("shimmerLoading");
+  const deckCountBadge = document.getElementById("deckCountBadge");
+  const searchInput = document.getElementById("searchInput");
+  const searchBox = document.getElementById("searchBox");
+  const toggleAllBtn = document.getElementById("toggleAllBtn");
+  const toastContainer = document.getElementById("toastContainer");
+
+  // Theme & Extra Feature Elements
+  const themeToggleBtn = document.getElementById("themeToggleBtn");
+  const filterPills = document.getElementById("filterPills");
+  const filterAllBtn = document.getElementById("filterAllBtn");
+  const filterStarredBtn = document.getElementById("filterStarredBtn");
+  const studyModeBtn = document.getElementById("studyModeBtn");
+  const printBtn = document.getElementById("printBtn");
+
+  // Study Modal Elements
+  const studyModal = document.getElementById("studyModal");
+  const studyModalBackdrop = document.getElementById("studyModalBackdrop");
+  const closeStudyBtn = document.getElementById("closeStudyBtn");
+  const studyCardBadge = document.getElementById("studyCardBadge");
+  const studyStarBtn = document.getElementById("studyStarBtn");
+  const flashcard3d = document.getElementById("flashcard3d");
+  const studyQuestionText = document.getElementById("studyQuestionText");
+  const studyAnswerText = document.getElementById("studyAnswerText");
+  const prevCardBtn = document.getElementById("prevCardBtn");
+  const flipCardBtn = document.getElementById("flipCardBtn");
+  const nextCardBtn = document.getElementById("nextCardBtn");
+
+  // Stepper Elements
+  const step1 = document.getElementById("step1Indicator");
+  const step2 = document.getElementById("step2Indicator");
+  const step3 = document.getElementById("step3Indicator");
+  const connector1 = document.getElementById("connector1");
+  const connector2 = document.getElementById("connector2");
+
   let selectedFile = null;
-  let uploadedPath = null; // path returned by /upload, sent on to /analyze
+  let uploadedPath = null;
+  let currentCards = [];
+  let isAllExpanded = true;
+  let starredIndices = new Set();
+  let currentFilter = "all";
+  let currentStudyIndex = 0;
 
-  // ---------- helpers ----------
+  // ---------- Stepper Helper ----------
+  function setStep(step) {
+    step1.classList.remove("active");
+    step2.classList.remove("active");
+    step3.classList.remove("active");
+    connector1.classList.remove("completed");
+    connector2.classList.remove("completed");
 
+    if (step >= 1) step1.classList.add("active");
+    if (step >= 2) {
+      step2.classList.add("active");
+      connector1.classList.add("completed");
+    }
+    if (step >= 3) {
+      step3.classList.add("active");
+      connector2.classList.add("completed");
+    }
+  }
+
+  // ---------- Toast Notification ----------
+  function showToast(message) {
+    if (!toastContainer) return;
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(10px)";
+      setTimeout(() => toast.remove(), 250);
+    }, 2400);
+  }
+
+  // ---------- Helpers ----------
   function setStamp(state, label) {
-    stamp.dataset.state = state;
-    stampText.textContent = label;
+    if (stamp) stamp.dataset.state = state;
+    if (stampText) stampText.textContent = label;
   }
 
   function setStatus(msg, isError) {
+    if (!statusLine) return;
     statusLine.textContent = msg || "";
     statusLine.classList.toggle("is-error", !!isError);
   }
@@ -36,8 +112,6 @@
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   }
 
-  // Parses the body of the /upload and /analyze endpoints, which is a
-  // JSON string served as text/plain (via json.dumps + jsonable_encoder).
   async function parseJsonResponse(res) {
     const raw = await res.text();
     try {
@@ -47,7 +121,6 @@
     }
   }
 
-  // Minimal CSV parser that respects quoted fields (commas/newlines inside quotes).
   function parseCsv(text) {
     const rows = [];
     let row = [];
@@ -92,10 +165,6 @@
     return rows;
   }
 
-  // Escapes HTML, then renders a small safe subset of markdown:
-  // **bold** / __bold__  ->  <strong>
-  // lines starting with "* " or "- "  ->  <ul><li>
-  // blank lines  ->  paragraph breaks
   function renderLiteMarkdown(raw) {
     const escapeHtml = (s) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -115,7 +184,7 @@
     const inlineFormat = (s) =>
       s.replace(
         /\*\*(.+?)\*\*|__(.+?)__/g,
-        (_, a, b) => "<strong>" + (a || b) + "</strong>",
+        (_, a, b) => "<strong>" + (a || b) + "</strong>"
       );
 
     lines.forEach((line) => {
@@ -140,168 +209,548 @@
     return html || "<p></p>";
   }
 
+  // ---------- Deck Renderer with HCI Enhancements ----------
   function renderDeck(rows) {
     deck.innerHTML = "";
     const dataRows = rows
       .slice(1)
       .filter((r) => r.length >= 2 && (r[0] || r[1]));
 
+    currentCards = dataRows;
+
+    if (deckCountBadge) {
+      deckCountBadge.textContent = dataRows.length + (dataRows.length === 1 ? " Card" : " Cards");
+    }
+
     if (!dataRows.length) {
-      emptyState.hidden = false;
+      if (emptyState) emptyState.hidden = false;
+      if (searchBox) searchBox.hidden = true;
+      if (toggleAllBtn) toggleAllBtn.hidden = true;
+      if (filterPills) filterPills.hidden = true;
+      if (studyModeBtn) studyModeBtn.hidden = true;
+      if (printBtn) printBtn.hidden = true;
       deck.appendChild(emptyState);
       return;
     }
 
+    if (emptyState) emptyState.hidden = true;
+    if (searchBox) searchBox.hidden = false;
+    if (toggleAllBtn) toggleAllBtn.hidden = false;
+    if (filterPills) filterPills.hidden = false;
+    if (studyModeBtn) studyModeBtn.hidden = false;
+    if (printBtn) printBtn.hidden = false;
+
     dataRows.forEach((r, idx) => {
       const card = document.createElement("article");
       card.className = "qa-card";
-      card.style.animationDelay = idx * 40 + "ms";
+      card.dataset.index = idx;
+      card.style.animationDelay = idx * 50 + "ms";
 
-      const index = document.createElement("div");
-      index.className = "qa-index";
-      index.textContent = "Q" + String(idx + 1).padStart(2, "0");
+      // Header row
+      const cardHeader = document.createElement("div");
+      cardHeader.className = "qa-card-header";
 
-      const q = document.createElement("p");
+      const indexBadge = document.createElement("span");
+      indexBadge.className = "qa-index";
+      indexBadge.textContent = "Q" + String(idx + 1).padStart(2, "0");
+
+      const cardTools = document.createElement("div");
+      cardTools.className = "qa-card-tools";
+
+      // Star Button
+      const starBtn = document.createElement("button");
+      starBtn.className = "btn-card-action btn-star" + (starredIndices.has(idx) ? " is-starred" : "");
+      starBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+      `;
+      starBtn.title = "Star this card for review";
+      starBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (starredIndices.has(idx)) {
+          starredIndices.delete(idx);
+          starBtn.classList.remove("is-starred");
+          showToast("Card unstarred");
+        } else {
+          starredIndices.add(idx);
+          starBtn.classList.add("is-starred");
+          showToast("Card starred ⭐");
+        }
+        updateStarredBadgeCount();
+        if (currentFilter === "starred") applyFilters();
+      });
+
+      // Copy Question Button
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "btn-card-action";
+      copyBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span>Copy</span>
+      `;
+      copyBtn.title = "Copy question and answer";
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const textToCopy = `Q: ${r[0]}\n\nA: ${r[1]}`;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast("Card copied to clipboard!");
+        });
+      });
+
+      // Toggle Answer Visibility Button
+      const toggleCardBtn = document.createElement("button");
+      toggleCardBtn.className = "btn-card-action";
+      toggleCardBtn.textContent = "Toggle Answer";
+
+      cardTools.appendChild(starBtn);
+      cardTools.appendChild(copyBtn);
+      cardTools.appendChild(toggleCardBtn);
+      cardHeader.appendChild(indexBadge);
+      cardHeader.appendChild(cardTools);
+
+      // Question
+      const q = document.createElement("h4");
       q.className = "qa-question";
       q.textContent = r[0];
+
+      // Answer Container
+      const answerContainer = document.createElement("div");
+      answerContainer.className = "qa-answer-container";
+
+      const answerBadge = document.createElement("div");
+      answerBadge.className = "qa-answer-badge";
+      answerBadge.textContent = "Answer";
 
       const a = document.createElement("div");
       a.className = "qa-answer";
       a.innerHTML = renderLiteMarkdown(r[1]);
 
-      card.appendChild(index);
+      answerContainer.appendChild(answerBadge);
+      answerContainer.appendChild(a);
+
+      // Toggle action on click
+      const toggleAnswer = () => {
+        answerContainer.classList.toggle("collapsed");
+      };
+
+      q.addEventListener("click", toggleAnswer);
+      toggleCardBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleAnswer();
+      });
+
+      card.appendChild(cardHeader);
       card.appendChild(q);
-      card.appendChild(a);
+      card.appendChild(answerContainer);
       deck.appendChild(card);
     });
   }
 
-  // ---------- file selection ----------
+  // ---------- Search Filter ----------
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const cards = deck.querySelectorAll(".qa-card");
+      cards.forEach((card) => {
+        const text = card.textContent.toLowerCase();
+        if (text.includes(query)) {
+          card.style.display = "";
+        } else {
+          card.style.display = "none";
+        }
+      });
+    });
+  }
 
+  // ---------- Expand/Collapse All ----------
+  if (toggleAllBtn) {
+    toggleAllBtn.addEventListener("click", () => {
+      isAllExpanded = !isAllExpanded;
+      const answerContainers = deck.querySelectorAll(".qa-answer-container");
+      answerContainers.forEach((container) => {
+        if (isAllExpanded) {
+          container.classList.remove("collapsed");
+        } else {
+          container.classList.add("collapsed");
+        }
+      });
+      toggleAllBtn.textContent = isAllExpanded ? "Collapse All" : "Expand All";
+    });
+  }
+
+  // ---------- File Selection ----------
   function handleFileSelected(file) {
     if (!file) return;
     if (
       file.type !== "application/pdf" &&
       !file.name.toLowerCase().endsWith(".pdf")
     ) {
-      setStatus("Please choose a PDF file.", true);
+      setStatus("Please choose a valid PDF file.", true);
+      showToast("Selected file is not a PDF.");
       return;
     }
 
     selectedFile = file;
     uploadedPath = null;
 
-    fileName.textContent = file.name;
-    fileSize.textContent = formatSize(file.size);
-    fileLine.hidden = false;
+    if (fileName) fileName.textContent = file.name;
+    if (fileSize) fileSize.textContent = formatSize(file.size);
+    if (fileLine) fileLine.hidden = false;
 
-    uploadBtn.disabled = false;
-    analyzeBtn.disabled = true;
+    if (uploadBtn) uploadBtn.disabled = false;
+    if (analyzeBtn) analyzeBtn.disabled = true;
 
+    setStep(1);
     setStamp("received", "RECEIVED");
-    setStatus("Ready to upload.");
+    setStatus("File selected. Ready to upload.");
+    showToast("PDF document loaded.");
   }
 
-  dropzone.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      fileInput.click();
-    }
-  });
+  function resetFileSelection() {
+    selectedFile = null;
+    uploadedPath = null;
+    if (fileInput) fileInput.value = "";
+    if (fileLine) fileLine.hidden = true;
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (analyzeBtn) analyzeBtn.disabled = true;
+    setStep(1);
+    setStamp("idle", "NO FILE");
+    setStatus("Awaiting document selection.");
+  }
 
-  fileInput.addEventListener("change", (e) =>
-    handleFileSelected(e.target.files[0]),
-  );
+  if (clearFileBtn) {
+    clearFileBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      resetFileSelection();
+    });
+  }
 
-  ["dragenter", "dragover"].forEach((evt) =>
-    dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropzone.classList.add("dragover");
-    }),
-  );
+  if (dropzone) {
+    dropzone.addEventListener("click", () => fileInput && fileInput.click());
+    dropzone.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        fileInput && fileInput.click();
+      }
+    });
 
-  ["dragleave", "drop"].forEach((evt) =>
-    dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropzone.classList.remove("dragover");
-    }),
-  );
-
-  dropzone.addEventListener("drop", (e) => {
-    const file = e.dataTransfer.files && e.dataTransfer.files[0];
-    handleFileSelected(file);
-  });
-
-  // ---------- upload ----------
-
-  uploadBtn.addEventListener("click", async () => {
-    if (!selectedFile) return;
-
-    uploadBtn.disabled = true;
-    setStamp("processing", "UPLOADING");
-    setStatus("Uploading document…");
-
-    try {
-      const formData = new FormData();
-      formData.append("pdf_file", selectedFile);
-      formData.append("filename", selectedFile.name);
-
-      const res = await fetch("/upload", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed (" + res.status + ").");
-
-      const data = await parseJsonResponse(res);
-      uploadedPath = data.pdf_filename;
-
-      setStamp("received", "UPLOADED");
-      setStatus("Uploaded. Ready to generate questions.");
-      analyzeBtn.disabled = false;
-    } catch (err) {
-      setStamp("error", "ERROR");
-      setStatus(err.message || "Upload failed.", true);
-      uploadBtn.disabled = false;
-    }
-  });
-
-  // ---------- analyze ----------
-
-  analyzeBtn.addEventListener("click", async () => {
-    if (!uploadedPath) return;
-
-    analyzeBtn.disabled = true;
-    setStamp("processing", "PROCESSING");
-    setStatus(
-      "Reading document and generating questions — this can take a moment…",
+    ["dragenter", "dragover"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      })
     );
 
-    try {
-      const formData = new FormData();
-      formData.append("pdf_filename", uploadedPath);
+    ["dragleave", "drop"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      })
+    );
 
-      const res = await fetch("/analyze", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Analysis failed (" + res.status + ").");
+    dropzone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleFileSelected(file);
+    });
+  }
 
-      const data = await parseJsonResponse(res);
-      const outputPath = data.output_file; // e.g. "static/output/QA.csv"
-      const outputUrl = "/" + outputPath.replace(/^\/+/, "");
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) =>
+      handleFileSelected(e.target.files[0])
+    );
+  }
 
-      const csvRes = await fetch(outputUrl, { cache: "no-store" });
-      if (!csvRes.ok) throw new Error("Could not load generated CSV.");
-      const csvText = await csvRes.text();
+  // ---------- Upload Handler ----------
+  if (uploadBtn) {
+    uploadBtn.addEventListener("click", async () => {
+      if (!selectedFile) return;
 
-      renderDeck(parseCsv(csvText));
+      uploadBtn.disabled = true;
+      setStamp("processing", "UPLOADING");
+      setStatus("Uploading document to server…");
 
-      downloadLink.href = outputUrl;
-      downloadLink.hidden = false;
+      try {
+        const formData = new FormData();
+        formData.append("pdf_file", selectedFile);
+        formData.append("filename", selectedFile.name);
 
-      setStamp("ready", "READY");
-      setStatus(
-        "Done — " + (parseCsv(csvText).length - 1) + " question(s) generated.",
-      );
-    } catch (err) {
-      setStamp("error", "ERROR");
-      setStatus(err.message || "Analysis failed.", true);
-      analyzeBtn.disabled = false;
+        const res = await fetch("/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed (" + res.status + ").");
+
+        const data = await parseJsonResponse(res);
+        uploadedPath = data.pdf_filename;
+
+        setStep(2);
+        setStamp("received", "UPLOADED");
+        setStatus("Document uploaded. Click 'Generate Questions' to process.");
+        if (analyzeBtn) analyzeBtn.disabled = false;
+        showToast("Upload successful!");
+      } catch (err) {
+        setStamp("error", "ERROR");
+        setStatus(err.message || "Upload failed.", true);
+        uploadBtn.disabled = false;
+        showToast("Error: Upload failed.");
+      }
+    });
+  }
+
+  // ---------- Analyze Handler ----------
+  if (analyzeBtn) {
+    analyzeBtn.addEventListener("click", async () => {
+      if (!uploadedPath) return;
+
+      analyzeBtn.disabled = true;
+      setStamp("processing", "PROCESSING");
+      setStatus("Reading document and generating questions — please wait…");
+
+      if (shimmerLoading) shimmerLoading.hidden = false;
+      if (deck) deck.style.opacity = "0.4";
+
+      try {
+        const formData = new FormData();
+        formData.append("pdf_filename", uploadedPath);
+
+        const res = await fetch("/analyze", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Analysis failed (" + res.status + ").");
+
+        const data = await parseJsonResponse(res);
+        const outputPath = data.output_file;
+        const outputUrl = "/" + outputPath.replace(/^\/+/, "");
+
+        const csvRes = await fetch(outputUrl, { cache: "no-store" });
+        if (!csvRes.ok) throw new Error("Could not load generated CSV.");
+        const csvText = await csvRes.text();
+
+        const rows = parseCsv(csvText);
+
+        if (shimmerLoading) shimmerLoading.hidden = true;
+        if (deck) deck.style.opacity = "1";
+
+        renderDeck(rows);
+
+        if (downloadLink) {
+          downloadLink.href = outputUrl;
+          downloadLink.hidden = false;
+        }
+
+        setStep(3);
+        setStamp("ready", "READY");
+        const count = rows.length - 1;
+        setStatus(`Done — ${count} question(s) generated.`);
+        showToast(`Deck ready! ${count} cards created.`);
+
+        // Scroll smoothly to deck results on mobile/desktop
+        const workspaceSection = document.getElementById("workspace");
+        if (workspaceSection) {
+          workspaceSection.scrollIntoView({ behavior: "smooth" });
+        }
+      } catch (err) {
+        if (shimmerLoading) shimmerLoading.hidden = true;
+        if (deck) deck.style.opacity = "1";
+
+        setStamp("error", "ERROR");
+        setStatus(err.message || "Analysis failed.", true);
+        analyzeBtn.disabled = false;
+        showToast("Error during question generation.");
+      }
+    });
+  }
+
+  // ---------- Theme Switcher ----------
+  function initTheme() {
+    const savedTheme = localStorage.getItem("questgen_theme") || "dark";
+    applyTheme(savedTheme);
+  }
+
+  function applyTheme(theme) {
+    if (theme === "light") {
+      document.documentElement.dataset.theme = "light";
+      if (themeToggleBtn) {
+        themeToggleBtn.querySelector(".sun-icon").hidden = true;
+        themeToggleBtn.querySelector(".moon-icon").hidden = false;
+      }
+    } else {
+      document.documentElement.dataset.theme = "dark";
+      if (themeToggleBtn) {
+        themeToggleBtn.querySelector(".sun-icon").hidden = false;
+        themeToggleBtn.querySelector(".moon-icon").hidden = true;
+      }
+    }
+    localStorage.setItem("questgen_theme", theme);
+  }
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", () => {
+      const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+      applyTheme(current === "light" ? "dark" : "light");
+    });
+  }
+
+  initTheme();
+
+  // ---------- Star & Filtering System ----------
+  function updateStarredBadgeCount() {
+    if (filterStarredBtn) {
+      filterStarredBtn.textContent = `Starred ★ (${starredIndices.size})`;
+    }
+  }
+
+  function applyFilters() {
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const cards = deck.querySelectorAll(".qa-card");
+
+    cards.forEach((card) => {
+      const originalIdx = parseInt(card.dataset.index, 10);
+      const isStarred = starredIndices.has(originalIdx);
+      const text = card.textContent.toLowerCase();
+      const matchesSearch = !query || text.includes(query);
+      const matchesFilter = currentFilter === "all" || (currentFilter === "starred" && isStarred);
+
+      if (matchesSearch && matchesFilter) {
+        card.style.display = "";
+      } else {
+        card.style.display = "none";
+      }
+    });
+  }
+
+  if (filterAllBtn) {
+    filterAllBtn.addEventListener("click", () => {
+      currentFilter = "all";
+      filterAllBtn.classList.add("active");
+      if (filterStarredBtn) filterStarredBtn.classList.remove("active");
+      applyFilters();
+    });
+  }
+
+  if (filterStarredBtn) {
+    filterStarredBtn.addEventListener("click", () => {
+      currentFilter = "starred";
+      filterStarredBtn.classList.add("active");
+      if (filterAllBtn) filterAllBtn.classList.remove("active");
+      applyFilters();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", applyFilters);
+  }
+
+  // ---------- Print Sheet ----------
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      window.print();
+    });
+  }
+
+  // ---------- 3D Flashcard Study Mode ----------
+  function openStudyModal(startIndex = 0) {
+    if (!currentCards.length) return;
+    currentStudyIndex = Math.max(0, Math.min(startIndex, currentCards.length - 1));
+    if (studyModal) {
+      studyModal.hidden = false;
+      studyModal.setAttribute("aria-hidden", "false");
+    }
+    renderStudyCard();
+  }
+
+  function closeStudyModal() {
+    if (studyModal) {
+      studyModal.hidden = true;
+      studyModal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function renderStudyCard() {
+    if (!currentCards.length) return;
+    const cardData = currentCards[currentStudyIndex];
+    if (flashcard3d) flashcard3d.classList.remove("is-flipped");
+
+    if (studyCardBadge) {
+      studyCardBadge.textContent = `Card ${currentStudyIndex + 1} of ${currentCards.length}`;
+    }
+
+    if (studyQuestionText) studyQuestionText.textContent = cardData[0] || "No Question";
+    if (studyAnswerText) studyAnswerText.innerHTML = renderLiteMarkdown(cardData[1] || "No Answer");
+
+    if (studyStarBtn) {
+      if (starredIndices.has(currentStudyIndex)) {
+        studyStarBtn.classList.add("is-starred");
+      } else {
+        studyStarBtn.classList.remove("is-starred");
+      }
+    }
+  }
+
+  if (studyModeBtn) {
+    studyModeBtn.addEventListener("click", () => openStudyModal(0));
+  }
+  if (closeStudyBtn) closeStudyBtn.addEventListener("click", closeStudyModal);
+  if (studyModalBackdrop) studyModalBackdrop.addEventListener("click", closeStudyModal);
+
+  if (flashcard3d) {
+    flashcard3d.addEventListener("click", () => {
+      flashcard3d.classList.toggle("is-flipped");
+    });
+  }
+  if (flipCardBtn) {
+    flipCardBtn.addEventListener("click", () => {
+      if (flashcard3d) flashcard3d.classList.toggle("is-flipped");
+    });
+  }
+  if (prevCardBtn) {
+    prevCardBtn.addEventListener("click", () => {
+      if (currentStudyIndex > 0) {
+        currentStudyIndex--;
+        renderStudyCard();
+      }
+    });
+  }
+  if (nextCardBtn) {
+    nextCardBtn.addEventListener("click", () => {
+      if (currentStudyIndex < currentCards.length - 1) {
+        currentStudyIndex++;
+        renderStudyCard();
+      }
+    });
+  }
+  if (studyStarBtn) {
+    studyStarBtn.addEventListener("click", () => {
+      if (starredIndices.has(currentStudyIndex)) {
+        starredIndices.delete(currentStudyIndex);
+        showToast("Card unstarred");
+      } else {
+        starredIndices.add(currentStudyIndex);
+        showToast("Card starred ⭐");
+      }
+      renderStudyCard();
+      updateStarredBadgeCount();
+      // Update star button in deck list view if rendered
+      const listCardStar = deck.querySelector(`.qa-card[data-index="${currentStudyIndex}"] .btn-star`);
+      if (listCardStar) {
+        listCardStar.classList.toggle("is-starred", starredIndices.has(currentStudyIndex));
+      }
+    });
+  }
+
+  // Keyboard Shortcuts for Flashcards
+  document.addEventListener("keydown", (e) => {
+    if (!studyModal || studyModal.hidden) return;
+
+    if (e.key === "Escape") {
+      closeStudyModal();
+    } else if (e.key === "ArrowLeft") {
+      if (currentStudyIndex > 0) {
+        currentStudyIndex--;
+        renderStudyCard();
+      }
+    } else if (e.key === "ArrowRight") {
+      if (currentStudyIndex < currentCards.length - 1) {
+        currentStudyIndex++;
+        renderStudyCard();
+      }
+    } else if (e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      if (flashcard3d) flashcard3d.classList.toggle("is-flipped");
     }
   });
 })();
+
