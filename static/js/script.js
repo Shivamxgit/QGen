@@ -25,8 +25,7 @@
   const toggleAllBtn = document.getElementById("toggleAllBtn");
   const toastContainer = document.getElementById("toastContainer");
 
-  // Theme & Extra Feature Elements
-  const themeToggleBtn = document.getElementById("themeToggleBtn");
+  // Extra Feature Elements
   const filterPills = document.getElementById("filterPills");
   const filterAllBtn = document.getElementById("filterAllBtn");
   const filterStarredBtn = document.getElementById("filterStarredBtn");
@@ -229,6 +228,7 @@
       if (filterPills) filterPills.hidden = true;
       if (studyModeBtn) studyModeBtn.hidden = true;
       if (printBtn) printBtn.hidden = true;
+      if (downloadLink) downloadLink.hidden = true;
       deck.appendChild(emptyState);
       return;
     }
@@ -239,6 +239,7 @@
     if (filterPills) filterPills.hidden = false;
     if (studyModeBtn) studyModeBtn.hidden = false;
     if (printBtn) printBtn.hidden = false;
+    if (downloadLink && uploadedPath) downloadLink.hidden = false;
 
     dataRows.forEach((r, idx) => {
       const card = document.createElement("article");
@@ -407,10 +408,14 @@
   function resetFileSelection() {
     selectedFile = null;
     uploadedPath = null;
+    currentCards = [];
+    starredIndices.clear();
     if (fileInput) fileInput.value = "";
     if (fileLine) fileLine.hidden = true;
     if (uploadBtn) uploadBtn.disabled = true;
     if (analyzeBtn) analyzeBtn.disabled = true;
+    if (downloadLink) downloadLink.hidden = true;
+    renderDeck([]);
     setStep(1);
     setStamp("idle", "NO FILE");
     setStatus("Awaiting document selection.");
@@ -554,37 +559,7 @@
     });
   }
 
-  // ---------- Theme Switcher ----------
-  function initTheme() {
-    const savedTheme = localStorage.getItem("questgen_theme") || "dark";
-    applyTheme(savedTheme);
-  }
 
-  function applyTheme(theme) {
-    if (theme === "light") {
-      document.documentElement.dataset.theme = "light";
-      if (themeToggleBtn) {
-        themeToggleBtn.querySelector(".sun-icon").hidden = true;
-        themeToggleBtn.querySelector(".moon-icon").hidden = false;
-      }
-    } else {
-      document.documentElement.dataset.theme = "dark";
-      if (themeToggleBtn) {
-        themeToggleBtn.querySelector(".sun-icon").hidden = false;
-        themeToggleBtn.querySelector(".moon-icon").hidden = true;
-      }
-    }
-    localStorage.setItem("questgen_theme", theme);
-  }
-
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener("click", () => {
-      const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
-      applyTheme(current === "light" ? "dark" : "light");
-    });
-  }
-
-  initTheme();
 
   // ---------- Star & Filtering System ----------
   function updateStarredBadgeCount() {
@@ -752,5 +727,56 @@
       if (flashcard3d) flashcard3d.classList.toggle("is-flipped");
     }
   });
+
+  // ---------- Navigation Active State & Scroll-Spy ----------
+  const navLinks = document.querySelectorAll(".nav-link");
+  const spySections = document.querySelectorAll("#workspace, #how-it-works, #features, #about");
+
+  function setActiveNav(activeId) {
+    navLinks.forEach((link) => {
+      const href = link.getAttribute("href");
+      if (href === "#" + activeId) {
+        link.classList.add("active");
+      } else {
+        link.classList.remove("active");
+      }
+    });
+  }
+
+  // Click Navigation
+  navLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      const href = link.getAttribute("href");
+      if (href && href.startsWith("#")) {
+        const targetId = href.substring(1);
+        const targetSec = document.getElementById(targetId);
+        if (targetSec) {
+          e.preventDefault();
+          setActiveNav(targetId);
+          targetSec.scrollIntoView({ behavior: "smooth" });
+        }
+      }
+    });
+  });
+
+  // Scroll Spy using IntersectionObserver
+  if ("IntersectionObserver" in window && spySections.length) {
+    const spyObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveNav(entry.target.id);
+          }
+        });
+      },
+      {
+        root: null,
+        rootMargin: "-20% 0px -55% 0px",
+        threshold: 0
+      }
+    );
+
+    spySections.forEach((sec) => spyObserver.observe(sec));
+  }
 })();
 
