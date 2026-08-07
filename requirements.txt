@@ -16,4 +16,5 @@ PyPDF2
 faiss-cpu
 python-dotenv
 streamlit
+sentence-transformers
 -e .
