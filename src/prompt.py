@@ -11,13 +11,15 @@ Study the following text carefully:
 
 Instructions:
 - Generate questions only from the provided text.
-- Create a maximum of 10 questions. 
+- Create exactly __NUM__ questions (no more).
 - Prioritize the most important concepts and key points to fit within this limit.
+- Difficulty level: __DIFFICULTY__.
+- Question type: __QTYPE__.
 - Avoid duplicate or repetitive questions.
 - Make the questions clear, concise, and grammatically correct.
-- Include a mix of factual, conceptual, and application-based questions whenever appropriate.
 - Do not provide answers.
 - Number each question (e.g., 1. , 2. , 3. ).
+- Write each question on a single line.
 - OUTPUT FORMAT: Output ONLY the numbered questions. Do not include any introductory text, concluding remarks, or conversational filler.
 
 QUESTIONS:

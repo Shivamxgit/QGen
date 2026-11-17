@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  // DOM Elements
+  // ---------- DOM Elements ----------
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const fileLine = document.getElementById("fileLine");
@@ -17,7 +17,7 @@
   const emptyState = document.getElementById("emptyState");
   const downloadLink = document.getElementById("downloadLink");
 
-  // New UX Elements
+  // UX Elements
   const shimmerLoading = document.getElementById("shimmerLoading");
   const deckCountBadge = document.getElementById("deckCountBadge");
   const searchInput = document.getElementById("searchInput");
@@ -51,6 +51,23 @@
   const step3 = document.getElementById("step3Indicator");
   const connector1 = document.getElementById("connector1");
   const connector2 = document.getElementById("connector2");
+
+  // Settings, reset, quiz, ask
+  const qTypeSelect = document.getElementById("qTypeSelect");
+  const difficultySelect = document.getElementById("difficultySelect");
+  const numQuestionsSelect = document.getElementById("numQuestionsSelect");
+  const resetBtn = document.getElementById("resetBtn");
+  const quizBtn = document.getElementById("quizBtn");
+  const quizModal = document.getElementById("quizModal");
+  const quizBackdrop = document.getElementById("quizBackdrop");
+  const closeQuizBtn = document.getElementById("closeQuizBtn");
+  const quizProgress = document.getElementById("quizProgress");
+  const quizBody = document.getElementById("quizBody");
+  const askPanel = document.getElementById("askPanel");
+  const askLog = document.getElementById("askLog");
+  const askForm = document.getElementById("askForm");
+  const askInput = document.getElementById("askInput");
+  const askBtn = document.getElementById("askBtn");
 
   let selectedFile = null;
   let uploadedPath = null;
@@ -105,6 +122,11 @@
     statusLine.classList.toggle("is-error", !!isError);
   }
 
+  function setAnalyzeLabel(text) {
+    const s = analyzeBtn ? analyzeBtn.querySelector("span") : null;
+    if (s) s.textContent = text;
+  }
+
   function formatSize(bytes) {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -118,6 +140,42 @@
     } catch (e) {
       throw new Error("Unexpected response from server.");
     }
+  }
+
+  function makeEl(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  // Show MCQ options on separate lines
+  function fillQuestion(el, text) {
+    el.textContent = "";
+    const str = String(text || "");
+    const parts = str.split(/\s+(?=\([A-D]\)\s)/);
+    if (parts.length >= 3) {
+      el.appendChild(document.createTextNode(parts[0]));
+      parts
+        .slice(1)
+        .forEach((p) => el.appendChild(makeEl("span", "q-option", p)));
+    } else {
+      el.textContent = str;
+    }
+  }
+
+  // Coloured grounding badge
+  function groundingChip(score) {
+    const n = parseInt(score, 10);
+    if (isNaN(n)) return null;
+    const level = n >= 70 ? "high" : n >= 55 ? "mid" : "low";
+    const chip = makeEl(
+      "span",
+      "ground-chip ground-" + level,
+      "Grounding " + n + "%",
+    );
+    chip.title = "How closely the answer matches the retrieved source text";
+    return chip;
   }
 
   function parseCsv(text) {
@@ -183,7 +241,7 @@
     const inlineFormat = (s) =>
       s.replace(
         /\*\*(.+?)\*\*|__(.+?)__/g,
-        (_, a, b) => "<strong>" + (a || b) + "</strong>"
+        (_, a, b) => "<strong>" + (a || b) + "</strong>",
       );
 
     lines.forEach((line) => {
@@ -208,7 +266,7 @@
     return html || "<p></p>";
   }
 
-  // ---------- Deck Renderer with HCI Enhancements ----------
+  // ---------- Deck Renderer ----------
   function renderDeck(rows) {
     deck.innerHTML = "";
     const dataRows = rows
@@ -218,7 +276,8 @@
     currentCards = dataRows;
 
     if (deckCountBadge) {
-      deckCountBadge.textContent = dataRows.length + (dataRows.length === 1 ? " Card" : " Cards");
+      deckCountBadge.textContent =
+        dataRows.length + (dataRows.length === 1 ? " Card" : " Cards");
     }
 
     if (!dataRows.length) {
@@ -227,6 +286,7 @@
       if (toggleAllBtn) toggleAllBtn.hidden = true;
       if (filterPills) filterPills.hidden = true;
       if (studyModeBtn) studyModeBtn.hidden = true;
+      if (quizBtn) quizBtn.hidden = true;
       if (printBtn) printBtn.hidden = true;
       if (downloadLink) downloadLink.hidden = true;
       deck.appendChild(emptyState);
@@ -235,9 +295,14 @@
 
     if (emptyState) emptyState.hidden = true;
     if (searchBox) searchBox.hidden = false;
-    if (toggleAllBtn) toggleAllBtn.hidden = false;
+    if (toggleAllBtn) {
+      toggleAllBtn.hidden = false;
+      toggleAllBtn.textContent = "Collapse All";
+    }
+    isAllExpanded = true;
     if (filterPills) filterPills.hidden = false;
     if (studyModeBtn) studyModeBtn.hidden = false;
+    if (quizBtn) quizBtn.hidden = false;
     if (printBtn) printBtn.hidden = false;
     if (downloadLink && uploadedPath) downloadLink.hidden = false;
 
@@ -260,7 +325,9 @@
 
       // Star Button
       const starBtn = document.createElement("button");
-      starBtn.className = "btn-card-action btn-star" + (starredIndices.has(idx) ? " is-starred" : "");
+      starBtn.className =
+        "btn-card-action btn-star" +
+        (starredIndices.has(idx) ? " is-starred" : "");
       starBtn.innerHTML = `
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
       `;
@@ -310,7 +377,7 @@
       // Question
       const q = document.createElement("h4");
       q.className = "qa-question";
-      q.textContent = r[0];
+      fillQuestion(q, r[0]);
 
       // Answer Container
       const answerContainer = document.createElement("div");
@@ -327,6 +394,17 @@
       answerContainer.appendChild(answerBadge);
       answerContainer.appendChild(a);
 
+      // Source page + grounding score
+      if (r[2]) {
+        answerContainer.appendChild(
+          makeEl("span", "source-chip", "Source: page " + r[2]),
+        );
+      }
+      if (r[3]) {
+        const g = groundingChip(r[3]);
+        if (g) answerContainer.appendChild(g);
+      }
+
       // Toggle action on click
       const toggleAnswer = () => {
         answerContainer.classList.toggle("collapsed");
@@ -342,22 +420,6 @@
       card.appendChild(q);
       card.appendChild(answerContainer);
       deck.appendChild(card);
-    });
-  }
-
-  // ---------- Search Filter ----------
-  if (searchInput) {
-    searchInput.addEventListener("input", (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      const cards = deck.querySelectorAll(".qa-card");
-      cards.forEach((card) => {
-        const text = card.textContent.toLowerCase();
-        if (text.includes(query)) {
-          card.style.display = "";
-        } else {
-          card.style.display = "none";
-        }
-      });
     });
   }
 
@@ -398,10 +460,13 @@
 
     if (uploadBtn) uploadBtn.disabled = false;
     if (analyzeBtn) analyzeBtn.disabled = true;
+    if (askPanel) askPanel.hidden = true;
+    if (askLog) askLog.innerHTML = "";
 
     setStep(1);
     setStamp("received", "RECEIVED");
     setStatus("File selected. Ready to upload.");
+    setAnalyzeLabel("Generate Questions");
     showToast("PDF document loaded.");
   }
 
@@ -410,21 +475,40 @@
     uploadedPath = null;
     currentCards = [];
     starredIndices.clear();
+    currentFilter = "all";
     if (fileInput) fileInput.value = "";
     if (fileLine) fileLine.hidden = true;
     if (uploadBtn) uploadBtn.disabled = true;
     if (analyzeBtn) analyzeBtn.disabled = true;
     if (downloadLink) downloadLink.hidden = true;
+    if (resetBtn) resetBtn.hidden = true;
+    if (askPanel) askPanel.hidden = true;
+    if (askLog) askLog.innerHTML = "";
+    if (searchInput) searchInput.value = "";
+    if (filterAllBtn) filterAllBtn.classList.add("active");
+    if (filterStarredBtn) filterStarredBtn.classList.remove("active");
+    updateStarredBadgeCount();
     renderDeck([]);
     setStep(1);
     setStamp("idle", "NO FILE");
     setStatus("Awaiting document selection.");
+    setAnalyzeLabel("Generate Questions");
   }
 
   if (clearFileBtn) {
     clearFileBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       resetFileSelection();
+    });
+  }
+
+  // "Upload New PDF" button
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      resetFileSelection();
+      showToast("Ready for a new PDF.");
+      const ws = document.getElementById("workspace");
+      if (ws) ws.scrollIntoView({ behavior: "smooth" });
     });
   }
 
@@ -441,14 +525,14 @@
       dropzone.addEventListener(evt, (e) => {
         e.preventDefault();
         dropzone.classList.add("dragover");
-      })
+      }),
     );
 
     ["dragleave", "drop"].forEach((evt) =>
       dropzone.addEventListener(evt, (e) => {
         e.preventDefault();
         dropzone.classList.remove("dragover");
-      })
+      }),
     );
 
     dropzone.addEventListener("drop", (e) => {
@@ -459,7 +543,7 @@
 
   if (fileInput) {
     fileInput.addEventListener("change", (e) =>
-      handleFileSelected(e.target.files[0])
+      handleFileSelected(e.target.files[0]),
     );
   }
 
@@ -487,6 +571,7 @@
         setStamp("received", "UPLOADED");
         setStatus("Document uploaded. Click 'Generate Questions' to process.");
         if (analyzeBtn) analyzeBtn.disabled = false;
+        if (askPanel) askPanel.hidden = false;
         showToast("Upload successful!");
       } catch (err) {
         setStamp("error", "ERROR");
@@ -512,6 +597,15 @@
       try {
         const formData = new FormData();
         formData.append("pdf_filename", uploadedPath);
+        formData.append(
+          "num_questions",
+          numQuestionsSelect ? numQuestionsSelect.value : "10",
+        );
+        formData.append(
+          "difficulty",
+          difficultySelect ? difficultySelect.value : "medium",
+        );
+        formData.append("q_type", qTypeSelect ? qTypeSelect.value : "mixed");
 
         const res = await fetch("/analyze", { method: "POST", body: formData });
         if (!res.ok) throw new Error("Analysis failed (" + res.status + ").");
@@ -529,20 +623,33 @@
         if (shimmerLoading) shimmerLoading.hidden = true;
         if (deck) deck.style.opacity = "1";
 
+        // fresh set of cards: clear old stars, search and filter
+        starredIndices.clear();
+        currentFilter = "all";
+        if (searchInput) searchInput.value = "";
+        if (filterAllBtn) filterAllBtn.classList.add("active");
+        if (filterStarredBtn) filterStarredBtn.classList.remove("active");
+        updateStarredBadgeCount();
+
         renderDeck(rows);
 
         if (downloadLink) {
           downloadLink.href = outputUrl;
           downloadLink.hidden = false;
         }
+        if (resetBtn) resetBtn.hidden = false;
+
+        // allow generating again with new settings (no re-upload needed)
+        analyzeBtn.disabled = false;
+        setAnalyzeLabel("Regenerate Questions");
 
         setStep(3);
         setStamp("ready", "READY");
         const count = rows.length - 1;
-        setStatus(`Done — ${count} question(s) generated.`);
+        const timeText = data.elapsed ? " in " + data.elapsed + "s" : "";
+        setStatus(`Done — ${count} question(s) generated${timeText}.`);
         showToast(`Deck ready! ${count} cards created.`);
 
-        // Scroll smoothly to deck results on mobile/desktop
         const workspaceSection = document.getElementById("workspace");
         if (workspaceSection) {
           workspaceSection.scrollIntoView({ behavior: "smooth" });
@@ -558,8 +665,6 @@
       }
     });
   }
-
-
 
   // ---------- Star & Filtering System ----------
   function updateStarredBadgeCount() {
@@ -577,7 +682,8 @@
       const isStarred = starredIndices.has(originalIdx);
       const text = card.textContent.toLowerCase();
       const matchesSearch = !query || text.includes(query);
-      const matchesFilter = currentFilter === "all" || (currentFilter === "starred" && isStarred);
+      const matchesFilter =
+        currentFilter === "all" || (currentFilter === "starred" && isStarred);
 
       if (matchesSearch && matchesFilter) {
         card.style.display = "";
@@ -619,7 +725,10 @@
   // ---------- 3D Flashcard Study Mode ----------
   function openStudyModal(startIndex = 0) {
     if (!currentCards.length) return;
-    currentStudyIndex = Math.max(0, Math.min(startIndex, currentCards.length - 1));
+    currentStudyIndex = Math.max(
+      0,
+      Math.min(startIndex, currentCards.length - 1),
+    );
     if (studyModal) {
       studyModal.hidden = false;
       studyModal.setAttribute("aria-hidden", "false");
@@ -643,8 +752,12 @@
       studyCardBadge.textContent = `Card ${currentStudyIndex + 1} of ${currentCards.length}`;
     }
 
-    if (studyQuestionText) studyQuestionText.textContent = cardData[0] || "No Question";
-    if (studyAnswerText) studyAnswerText.innerHTML = renderLiteMarkdown(cardData[1] || "No Answer");
+    if (studyQuestionText)
+      fillQuestion(studyQuestionText, cardData[0] || "No Question");
+    if (studyAnswerText)
+      studyAnswerText.innerHTML = renderLiteMarkdown(
+        cardData[1] || "No Answer",
+      );
 
     if (studyStarBtn) {
       if (starredIndices.has(currentStudyIndex)) {
@@ -659,7 +772,8 @@
     studyModeBtn.addEventListener("click", () => openStudyModal(0));
   }
   if (closeStudyBtn) closeStudyBtn.addEventListener("click", closeStudyModal);
-  if (studyModalBackdrop) studyModalBackdrop.addEventListener("click", closeStudyModal);
+  if (studyModalBackdrop)
+    studyModalBackdrop.addEventListener("click", closeStudyModal);
 
   if (flashcard3d) {
     flashcard3d.addEventListener("click", () => {
@@ -698,10 +812,14 @@
       }
       renderStudyCard();
       updateStarredBadgeCount();
-      // Update star button in deck list view if rendered
-      const listCardStar = deck.querySelector(`.qa-card[data-index="${currentStudyIndex}"] .btn-star`);
+      const listCardStar = deck.querySelector(
+        `.qa-card[data-index="${currentStudyIndex}"] .btn-star`,
+      );
       if (listCardStar) {
-        listCardStar.classList.toggle("is-starred", starredIndices.has(currentStudyIndex));
+        listCardStar.classList.toggle(
+          "is-starred",
+          starredIndices.has(currentStudyIndex),
+        );
       }
     });
   }
@@ -728,9 +846,289 @@
     }
   });
 
+  // ---------- Quiz Mode ----------
+  let quizOrder = [];
+  let quizPos = 0;
+  let quizScore = 0;
+  let quizMissed = [];
+
+  function startQuiz(indices) {
+    if (!quizModal || !indices.length) return;
+    quizOrder = indices.slice().sort(() => Math.random() - 0.5);
+    quizMissed = [];
+    quizPos = 0;
+    quizScore = 0;
+    quizModal.hidden = false;
+    quizModal.setAttribute("aria-hidden", "false");
+    renderQuizStep(false);
+  }
+
+  // Detect MCQ / True-False questions and work out the correct option
+  function parseQuizItem(card) {
+    const qText = String(card[0] || "");
+    const ansText = String(card[1] || "");
+
+    // True / False
+    const tf = qText.match(
+      /^\s*true\s*(?:or|\/)\s*false\s*[:\-\u2013]?\s*(.*)$/i,
+    );
+    if (tf) {
+      const m = ansText.match(/\b(true|false)\b/i);
+      if (m) {
+        return {
+          kind: "tf",
+          stem: tf[1] || qText,
+          options: ["True", "False"],
+          correct: m[1].toLowerCase() === "true" ? 0 : 1,
+        };
+      }
+    }
+
+    // Multiple choice
+    const parts = qText.split(/\s+(?=\([A-D]\)\s)/);
+    if (parts.length >= 3) {
+      const letters = parts
+        .slice(1)
+        .map((p) => (p.match(/^\(([A-D])\)/) || [])[1]);
+      const m =
+        ansText.match(
+          /[Cc]orrect\s+(?:[Aa]nswer|[Oo]ption|[Cc]hoice)\s*(?:is|:)?\s*[:\-]?\s*\**\(?([A-D])\)?(?![A-Za-z])/,
+        ) || ansText.match(/\(([A-D])\)/);
+      if (m) {
+        const idx = letters.indexOf(m[1]);
+        if (idx !== -1) {
+          return {
+            kind: "mcq",
+            stem: parts[0],
+            options: parts.slice(1),
+            correct: idx,
+          };
+        }
+      }
+    }
+
+    return { kind: "open" };
+  }
+
+  // Pick-an-option question (MCQ and True/False)
+  function renderChoiceQuestion(card, item, idx) {
+    quizBody.appendChild(makeEl("div", "quiz-question", item.stem));
+
+    const list = makeEl("div", "quiz-options");
+    const buttons = [];
+
+    item.options.forEach((label, i) => {
+      const b = makeEl("button", "quiz-option", label);
+      b.type = "button";
+      b.addEventListener("click", () => {
+        buttons.forEach((x) => (x.disabled = true));
+        const isRight = i === item.correct;
+        b.classList.add(isRight ? "is-correct" : "is-wrong");
+        if (!isRight && buttons[item.correct])
+          buttons[item.correct].classList.add("is-correct");
+
+        if (isRight) quizScore++;
+        else quizMissed.push(idx);
+
+        quizBody.appendChild(
+          makeEl(
+            "div",
+            "quiz-feedback " + (isRight ? "fb-right" : "fb-wrong"),
+            isRight ? "✓ Correct!" : "✗ Not quite.",
+          ),
+        );
+
+        const ans = makeEl("div", "quiz-answer");
+        ans.innerHTML = renderLiteMarkdown(card[1]);
+        quizBody.appendChild(ans);
+        if (card[2])
+          quizBody.appendChild(
+            makeEl("span", "source-chip", "Source: page " + card[2]),
+          );
+
+        const row = makeEl("div", "quiz-actions");
+        const isLast = quizPos >= quizOrder.length - 1;
+        const next = makeEl(
+          "button",
+          "btn btn-primary",
+          isLast ? "See score" : "Next",
+        );
+        next.addEventListener("click", () => {
+          quizPos++;
+          renderQuizStep(false);
+        });
+        row.appendChild(next);
+        quizBody.appendChild(row);
+      });
+      buttons.push(b);
+      list.appendChild(b);
+    });
+
+    quizBody.appendChild(list);
+  }
+
+  function renderQuizStep(revealed) {
+    quizBody.innerHTML = "";
+    if (quizPos >= quizOrder.length) {
+      renderQuizResult();
+      return;
+    }
+    const idx = quizOrder[quizPos];
+    const card = currentCards[idx];
+    const item = parseQuizItem(card);
+    quizProgress.textContent = `Question ${quizPos + 1} of ${quizOrder.length}`;
+
+    // MCQ / True-False: user picks an option
+    if (item.kind === "mcq" || item.kind === "tf") {
+      renderChoiceQuestion(card, item, idx);
+      return;
+    }
+
+    // Short answer / mixed: show answer, then self-check
+    const qBox = makeEl("div", "quiz-question");
+    fillQuestion(qBox, card[0]);
+    quizBody.appendChild(qBox);
+
+    if (!revealed) {
+      const show = makeEl("button", "btn btn-primary", "Show Answer");
+      show.addEventListener("click", () => renderQuizStep(true));
+      quizBody.appendChild(show);
+      return;
+    }
+
+    const ans = makeEl("div", "quiz-answer");
+    ans.innerHTML = renderLiteMarkdown(card[1]);
+    quizBody.appendChild(ans);
+    if (card[2])
+      quizBody.appendChild(
+        makeEl("span", "source-chip", "Source: page " + card[2]),
+      );
+
+    const row = makeEl("div", "quiz-actions");
+    const got = makeEl("button", "btn btn-primary", "✓ I knew it");
+    const missed = makeEl("button", "btn btn-secondary", "✗ Missed it");
+    got.addEventListener("click", () => {
+      quizScore++;
+      quizPos++;
+      renderQuizStep(false);
+    });
+    missed.addEventListener("click", () => {
+      quizMissed.push(idx);
+      quizPos++;
+      renderQuizStep(false);
+    });
+    row.appendChild(got);
+    row.appendChild(missed);
+    quizBody.appendChild(row);
+  }
+
+  function renderQuizResult() {
+    const total = quizOrder.length;
+    const pct = Math.round((quizScore / total) * 100);
+    quizProgress.textContent = "Quiz complete";
+    quizBody.appendChild(
+      makeEl("div", "quiz-score", `${quizScore} / ${total}`),
+    );
+    const msg =
+      pct >= 80
+        ? "Excellent!"
+        : pct >= 50
+          ? "Good, keep practicing."
+          : "Review the missed cards and try again.";
+    quizBody.appendChild(makeEl("div", "quiz-question", `${pct}% — ${msg}`));
+
+    const row = makeEl("div", "quiz-actions");
+    if (quizMissed.length) {
+      const missedCopy = quizMissed.slice();
+      const retry = makeEl(
+        "button",
+        "btn btn-primary",
+        `Retry missed (${missedCopy.length})`,
+      );
+      retry.addEventListener("click", () => startQuiz(missedCopy));
+      row.appendChild(retry);
+    }
+    const again = makeEl("button", "btn btn-secondary", "Restart quiz");
+    again.addEventListener("click", () =>
+      startQuiz(currentCards.map((_, i) => i)),
+    );
+    row.appendChild(again);
+    quizBody.appendChild(row);
+  }
+
+  function closeQuiz() {
+    if (!quizModal) return;
+    quizModal.hidden = true;
+    quizModal.setAttribute("aria-hidden", "true");
+  }
+
+  if (quizBtn)
+    quizBtn.addEventListener("click", () =>
+      startQuiz(currentCards.map((_, i) => i)),
+    );
+  if (closeQuizBtn) closeQuizBtn.addEventListener("click", closeQuiz);
+  if (quizBackdrop) quizBackdrop.addEventListener("click", closeQuiz);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && quizModal && !quizModal.hidden) closeQuiz();
+  });
+
+  // ---------- Ask Your PDF ----------
+  function addAskMessage(role, text) {
+    const m = makeEl(
+      "div",
+      "ask-msg " + (role === "user" ? "ask-user" : "ask-bot"),
+      text,
+    );
+    askLog.appendChild(m);
+    askLog.scrollTop = askLog.scrollHeight;
+    return m;
+  }
+
+  if (askForm) {
+    askForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const q = askInput.value.trim();
+      if (!q || !uploadedPath) return;
+
+      addAskMessage("user", q);
+      askInput.value = "";
+      askBtn.disabled = true;
+      const reply = addAskMessage("bot", "Thinking…");
+
+      try {
+        const fd = new FormData();
+        fd.append("pdf_filename", uploadedPath);
+        fd.append("question", q);
+        const res = await fetch("/ask", { method: "POST", body: fd });
+        if (!res.ok) throw new Error("Request failed (" + res.status + ").");
+        const data = await res.json();
+
+        reply.innerHTML = renderLiteMarkdown(data.answer);
+        if (data.pages && data.pages.length) {
+          reply.appendChild(
+            makeEl(
+              "span",
+              "source-chip",
+              "Source: page " + data.pages.join(", "),
+            ),
+          );
+        }
+        const g = groundingChip(data.grounding);
+        if (g) reply.appendChild(g);
+      } catch (err) {
+        reply.textContent = err.message || "Something went wrong.";
+      }
+
+      askBtn.disabled = false;
+      askLog.scrollTop = askLog.scrollHeight;
+    });
+  }
+
   // ---------- Navigation Active State & Scroll-Spy ----------
   const navLinks = document.querySelectorAll(".nav-link");
-  const spySections = document.querySelectorAll("#workspace, #how-it-works, #features, #about");
+  const spySections = document.querySelectorAll(
+    "#workspace, #how-it-works, #features, #about",
+  );
 
   function setActiveNav(activeId) {
     navLinks.forEach((link) => {
@@ -743,7 +1141,6 @@
     });
   }
 
-  // Click Navigation
   navLinks.forEach((link) => {
     link.addEventListener("click", (e) => {
       const href = link.getAttribute("href");
@@ -759,7 +1156,6 @@
     });
   });
 
-  // Scroll Spy using IntersectionObserver
   if ("IntersectionObserver" in window && spySections.length) {
     const spyObserver = new IntersectionObserver(
       (entries) => {
@@ -772,11 +1168,10 @@
       {
         root: null,
         rootMargin: "-20% 0px -55% 0px",
-        threshold: 0
-      }
+        threshold: 0,
+      },
     );
 
     spySections.forEach((sec) => spyObserver.observe(sec));
   }
 })();
-
